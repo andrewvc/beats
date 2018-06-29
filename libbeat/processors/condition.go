@@ -49,6 +49,7 @@ type Condition struct {
 		name    string
 		filters map[string]match.Matcher
 	}
+	checks []func(event ValuesMap) bool
 	hasfields []string
 	rangexp   map[string]RangeValue
 	or        []Condition
@@ -92,22 +93,38 @@ func NewCondition(config *ConditionConfig) (*Condition, error) {
 	switch {
 	case config.Equals != nil:
 		err = c.setEquals(config.Equals)
+
+		c.checks = append(c.checks, c.checkEquals)
 	case config.Contains != nil:
 		c.matches.name = "contains"
 		c.matches.filters, err = compileMatches(config.Contains.fields, match.CompileString)
+
+		c.checks = append(c.checks, c.checkMatches)
 	case config.Regexp != nil:
 		c.matches.name = "regexp"
 		c.matches.filters, err = compileMatches(config.Regexp.fields, match.Compile)
+
+		c.checks = append(c.checks, c.checkMatches)
 	case config.Range != nil:
 		err = c.setRange(config.Range)
+
+		c.checks = append(c.checks, c.checkRange)
 	case config.HasFields != nil:
 		c.hasfields = config.HasFields
+
+		c.checks = append(c.checks, c.checkHasFields)
 	case len(config.OR) > 0:
 		c.or, err = NewConditionList(config.OR)
+
+		c.checks = append(c.checks, c.checkOR)
 	case len(config.AND) > 0:
 		c.and, err = NewConditionList(config.AND)
+
+		c.checks = append(c.checks, c.checkAND)
 	case config.NOT != nil:
 		c.not, err = NewCondition(config.NOT)
+
+		c.checks = append(c.checks, c.checkNOT)
 	default:
 		err = errors.New("missing condition")
 	}
@@ -231,23 +248,19 @@ func (c *Condition) setRange(cfg *ConditionFields) error {
 	return nil
 }
 
-func (c *Condition) Check(event ValuesMap) bool {
-	if len(c.or) > 0 {
-		return c.checkOR(event)
+func (c *Condition) Check(event ValuesMap) (res bool) {
+	// If there are checks defined, run them
+	if len(c.checks) > 0 {
+		// The default value of false would always yield
+		// false when '&&' is used later, so we set to true
+		// We want to return false if no checks are defined however
+		res = true
+		for _, checker := range c.checks {
+			res = res && checker(event)
+		}
 	}
 
-	if len(c.and) > 0 {
-		return c.checkAND(event)
-	}
-
-	if c.not != nil {
-		return c.checkNOT(event)
-	}
-
-	return c.checkEquals(event) &&
-		c.checkMatches(event) &&
-		c.checkRange(event) &&
-		c.checkHasFields(event)
+	return res
 }
 
 func (c *Condition) checkOR(event ValuesMap) bool {

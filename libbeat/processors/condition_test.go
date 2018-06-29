@@ -186,6 +186,72 @@ func TestCondition(t *testing.T) {
 			},
 			result: false,
 		},
+		{ // Compound true statements return true
+			config: ConditionConfig{
+				Equals: &ConditionFields{fields: map[string]interface{}{
+					"final": false,
+				}},
+				HasFields: []string{"proc.cmdline"},
+			},
+			result: true,
+		},
+		{ // Compound false and true statements return false
+			config: ConditionConfig{
+				Equals: &ConditionFields{fields: map[string]interface{}{
+					"final": true, // is false
+				}},
+				HasFields: []string{"proc.cmdline"},
+			},
+			result: false,
+		},
+		{ // Compound clauses can be mixed with leaf clauses
+			config: ConditionConfig{
+				AND: []ConditionConfig {
+					{
+						Equals: &ConditionFields{fields: map[string]interface{}{
+							"final": true, // is false
+						}},
+					},
+					{
+						HasFields: []string{"proc.cmdline"},
+					},
+				},
+				HasFields: []string{"type"},
+			},
+			result: true,
+		},
+		{ // Negating leaf returns false
+			config: ConditionConfig{
+				AND: []ConditionConfig {
+					{
+						Equals: &ConditionFields{fields: map[string]interface{}{
+							"final": true, // is false
+						}},
+					},
+					{
+						HasFields: []string{"proc.cmdline"},
+					},
+				},
+				HasFields: []string{"notafield"},
+			},
+			result: false,
+		},
+		{ // Negating compound returns false
+			config: ConditionConfig{
+				AND: []ConditionConfig {
+					{
+						Equals: &ConditionFields{fields: map[string]interface{}{
+							"final": true, // is false
+						}},
+					},
+					{
+						HasFields: []string{"notafield"},
+					},
+				},
+				HasFields: []string{"type"},
+			},
+			result: true,
+		},
 	}
 
 	event := &beat.Event{
