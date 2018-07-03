@@ -529,6 +529,7 @@ func TestNOTCondition(t *testing.T) {
 	assert.False(t, conds[0].Check(event))
 }
 
+
 func TestCombinedCondition(t *testing.T) {
 	logp.TestingSetup()
 	configs := []ConditionConfig{
@@ -593,6 +594,94 @@ func TestCombinedCondition(t *testing.T) {
 	}
 
 	assert.True(t, conds[0].Check(event))
+}
+
+func BenchmarkSimpleCondition(b *testing.B) {
+	config := ConditionConfig{
+		HasFields: []string{"afield"},
+	}
+
+	cond, err := NewCondition(&config)
+	if err != nil {
+		panic(err)
+	}
+
+	event := &beat.Event{
+		Timestamp: time.Now(),
+		Fields: common.MapStr{
+			"@timestamp":    "2015-06-11T09:51:23.642Z",
+			"afield": "avalue",
+		},
+	}
+
+	for i := 0; i < b.N; i++ {
+		cond.Check(event)
+  }
+}
+
+func BenchmarkCombinedCondition(b *testing.B) {
+	config := ConditionConfig{
+		OR: []ConditionConfig{
+			{
+				Range: &ConditionFields{fields: map[string]interface{}{
+					"http.code.gte": 100,
+					"http.code.lt":  300,
+				}},
+			},
+			{
+				AND: []ConditionConfig{
+					{
+						Equals: &ConditionFields{fields: map[string]interface{}{
+							"status": 200,
+						}},
+					},
+					{
+						Equals: &ConditionFields{fields: map[string]interface{}{
+							"type": "http",
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	cond, err := NewCondition(&config)
+	if err != nil {
+		panic(err)
+	}
+
+	event := &beat.Event{
+		Timestamp: time.Now(),
+		Fields: common.MapStr{
+			"@timestamp":    "2015-06-11T09:51:23.642Z",
+			"bytes_in":      126,
+			"bytes_out":     28033,
+			"client_ip":     "127.0.0.1",
+			"client_port":   42840,
+			"client_proc":   "",
+			"client_server": "mar.local",
+			"http": common.MapStr{
+				"code":           200,
+				"content_length": 76985,
+				"phrase":         "OK",
+			},
+			"ip":           "127.0.0.1",
+			"method":       "GET",
+			"params":       "",
+			"path":         "/jszip.min.js",
+			"port":         8000,
+			"proc":         "",
+			"query":        "GET /jszip.min.js",
+			"responsetime": 30,
+			"server":       "mar.local",
+			"status":       "OK",
+			"type":         "http",
+		},
+	}
+
+	for i := 0; i < b.N; i++ {
+		cond.Check(event)
+	}
 }
 
 func TestWhenProcessor(t *testing.T) {
