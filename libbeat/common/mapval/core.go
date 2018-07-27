@@ -96,7 +96,7 @@ func Strict(laxValidator Validator) Validator {
 				return
 			}
 
-			results.record(woi.dottedPath, StrictFailureVR)
+			results.merge(StrictFailureResult(woi.dottedPath))
 		})
 
 		return results
@@ -132,10 +132,8 @@ func walkValidate(expected Map, actual common.MapStr) (results *Results) {
 			}
 
 			if !isDef.optional || isDef.optional && actualKeyExists {
-				results.record(
-					expInfo.dottedPath,
-					isDef.check(actualV, actualKeyExists),
-				)
+				checkRes := isDef.check(expInfo.dottedPath, actualV, actualKeyExists)
+				results.merge(checkRes)
 			}
 		})
 

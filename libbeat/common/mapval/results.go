@@ -35,6 +35,45 @@ func NewResults() *Results {
 	}
 }
 
+// SimpleResult provides a convenient and simple method for creating a *Results object for a single validation.
+// It's a very common way for validators to return a *Results object, and is generally simpler than
+// using SingleResult.
+func SimpleResult(path string, valid bool, msg string) *Results {
+	vr := ValueResult{valid, msg}
+	return SingleResult(path, vr)
+}
+
+// SingleResult returns a *Results object with a single validated value at the given path
+// using the provided ValueResult as its sole validation.
+func SingleResult(path string, result ValueResult) *Results {
+	r := NewResults()
+	r.record(path, result)
+	return r
+}
+
+func (r *Results) merge(other *Results) {
+	for path, valueResults := range other.Fields {
+		for _, valueResult := range valueResults {
+			r.record(path, valueResult)
+		}
+	}
+}
+
+func (r *Results) mergeUnderPrefix(prefix string, other *Results) {
+	if prefix == "" {
+		// If the prefix is empty, just use standard merge
+		// No need to add the dots
+		r.merge(other)
+		return
+	}
+
+	for path, valueResults := range other.Fields {
+		for _, valueResult := range valueResults {
+			r.record(prefix+"."+path, valueResult)
+		}
+	}
+}
+
 func (r *Results) record(path string, result ValueResult) {
 	if r.Fields[path] == nil {
 		r.Fields[path] = []ValueResult{result}

@@ -63,7 +63,7 @@ func TestBadFlat(t *testing.T) {
 
 	result := results.Fields["notafield"][0]
 	assert.False(t, result.Valid)
-	assert.Equal(t, result.Message, KeyMissingVR.Message)
+	assert.Equal(t, result, KeyMissingVR)
 }
 
 func TestNested(t *testing.T) {
@@ -188,6 +188,7 @@ func TestComplex(t *testing.T) {
 		},
 		"slice": []string{"pizza", "pasta", "and more"},
 		"empty": nil,
+		"arr":   []common.MapStr{{"foo": "bar"}, {"foo": "baz"}},
 	}
 
 	res := Schema(Map{
@@ -202,7 +203,41 @@ func TestComplex(t *testing.T) {
 		"slice":        []string{"pizza", "pasta", "and more"},
 		"empty":        KeyPresent,
 		"doesNotExist": KeyMissing,
+		"arr":          IsArrayOf(Schema(Map{"foo": IsStringContaining("a")})),
 	})(m)
 
 	assertResults(t, res)
+}
+
+func TestLiteralArray(t *testing.T) {
+	m := common.MapStr{
+		"a": [][]int{
+			{1, 2, 3},
+			{4, 5, 6},
+		},
+	}
+
+	validator := Schema(Map{
+		"a": [][]int{
+			{1, 2, 3},
+			{4, 5, 6},
+		},
+	})
+
+	goodRes := validator(m)
+	assertResults(t, goodRes)
+	// We evaluate multidimensional arrays as a single field for now
+	// This is kind of easier, but maybe we should do our own traversal later.
+	assert.Len(t, goodRes.Fields, 1)
+
+	badValidator := Schema(Map{
+		"a": [][]int{
+			{1, 2, 3},
+		},
+	})
+
+	badRes := badValidator(m)
+
+	assert.False(t, badRes.Valid)
+	assert.Len(t, badRes.Errors(), 1)
 }
