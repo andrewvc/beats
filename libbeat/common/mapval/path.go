@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"reflect"
+
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -70,24 +72,22 @@ func (p Path) Last() PathComponent {
 
 func (p Path) GetFrom(m common.MapStr) (exists bool, value interface{}) {
 	value = m
-	for idx, pc := range p {
-		switch typed := value.(type) {
-		case common.MapStr:
-			value, exists = typed[pc.Key]
-		case map[string]interface{}:
-			value, exists = typed[pc.Key]
-		case []interface{}:
-			if pc.Index < len(typed) {
+	for _, pc := range p {
+		switch reflect.TypeOf(value).Kind() {
+		case reflect.Map:
+			converted := interfaceToMapStr(value)
+			value, exists = converted[pc.Key]
+		case reflect.Slice:
+			converted := sliceToSliceOfInterfaces(value)
+			if pc.Index < len(converted) {
 				exists = true
-				value = typed[pc.Index]
+				value = converted[pc.Index]
 			} else {
 				exists = false
 				value = nil
 			}
 		default:
-			if idx == len(p)-1 {
-				return true, value
-			}
+			panic("Unexpected type")
 		}
 	}
 

@@ -39,24 +39,13 @@ func walk(m common.MapStr, wo walkObserver) {
 }
 
 func walkFull(o interface{}, root common.MapStr, path Path, wo walkObserver) {
-	rt := reflect.TypeOf(o)
-	switch rt.Kind() {
+	switch reflect.TypeOf(o).Kind() {
 	case reflect.Map:
-		newMap := common.MapStr{}
-		rv := reflect.ValueOf(o)
-
-		for _, key := range rv.MapKeys() {
-			value := rv.MapIndex(key).Interface().(interface{})
-			newMap[key.Interface().(string)] = value
-		}
-		walkFullMap(newMap, root, path, wo)
+		converted := interfaceToMapStr(o)
+		walkFullMap(converted, root, path, wo)
 	case reflect.Slice:
-		rv := reflect.ValueOf(o)
-		converted := make([]interface{}, rv.Len())
-		for i := 0; i < rv.Len(); i++ {
-			c := rv.Index(i).Interface().(interface{})
-			converted[i] = c
-		}
+		converted := sliceToSliceOfInterfaces(o)
+
 		for idx, v := range converted {
 			// Add array subscript to last path element
 			newPath := path.ExtendSlice(idx)

@@ -246,8 +246,7 @@ func TestStringArray(t *testing.T) {
 	assertResults(t, goodRes)
 	// We evaluate multidimensional arrays as a single field for now
 	// This is kind of easier, but maybe we should do our own traversal later.
-	assert.Len(t, goodRes.Fields, 1)
-
+	assert.Len(t, goodRes.Fields, 2)
 }
 
 func TestLiteralMdArray(t *testing.T) {
