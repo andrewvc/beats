@@ -52,7 +52,7 @@ func Compose(validators ...Validator) Validator {
 
 		combined := NewResults()
 		for _, r := range results {
-			r.EachResult(func(path string, vr ValueResult) bool {
+			r.EachResult(func(path Path, vr ValueResult) bool {
 				combined.record(path, vr)
 				return true
 			})
@@ -84,19 +84,19 @@ func Strict(laxValidator Validator) Validator {
 		sort.Strings(validatedPaths)
 
 		walk(actual, func(woi walkObserverInfo) {
-			_, validatedExactly := results.Fields[woi.dottedPath]
+			_, validatedExactly := results.Fields[woi.path.String()]
 			if validatedExactly {
 				return // This key was tested, passes strict test
 			}
 
 			// Search returns the point just before an actual match (since we ruled out an exact match with the cheaper
 			// hash check above. We have to validate the actual match with a prefix check as well
-			matchIdx := sort.SearchStrings(validatedPaths, woi.dottedPath)
-			if matchIdx < len(validatedPaths) && strings.HasPrefix(validatedPaths[matchIdx], woi.dottedPath) {
+			matchIdx := sort.SearchStrings(validatedPaths, woi.path.String())
+			if matchIdx < len(validatedPaths) && strings.HasPrefix(validatedPaths[matchIdx], woi.path.String()) {
 				return
 			}
 
-			results.merge(StrictFailureResult(woi.dottedPath))
+			results.merge(StrictFailureResult(woi.path))
 		})
 
 		return results
@@ -116,8 +116,7 @@ func walkValidate(expected Map, actual common.MapStr) (results *Results) {
 		common.MapStr(expected),
 		func(expInfo walkObserverInfo) {
 
-			actualKeyExists, _ := actual.HasKey(expInfo.dottedPath)
-			actualV, _ := actual.GetValue(expInfo.dottedPath)
+			actualKeyExists, actualV := expInfo.path.GetFrom(actual)
 
 			// If this is a definition use it, if not, check exact equality
 			isDef, isIsDef := expInfo.value.(IsDef)
@@ -132,7 +131,7 @@ func walkValidate(expected Map, actual common.MapStr) (results *Results) {
 			}
 
 			if !isDef.optional || isDef.optional && actualKeyExists {
-				checkRes := isDef.check(expInfo.dottedPath, actualV, actualKeyExists)
+				checkRes := isDef.check(expInfo.path, actualV, actualKeyExists)
 				results.merge(checkRes)
 			}
 		})

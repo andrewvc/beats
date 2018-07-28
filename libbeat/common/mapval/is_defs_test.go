@@ -28,7 +28,7 @@ import (
 )
 
 func assertIsDefValid(t *testing.T, id IsDef, value interface{}) *Results {
-	res := id.check("p", value, true)
+	res := id.check(MustParsePath("p"), value, true)
 	if !res.Valid {
 		assert.Fail(
 			t,
@@ -40,7 +40,7 @@ func assertIsDefValid(t *testing.T, id IsDef, value interface{}) *Results {
 }
 
 func assertIsDefInvalid(t *testing.T, id IsDef, value interface{}) *Results {
-	res := id.check("p", value, true)
+	res := id.check(MustParsePath("p"), value, true)
 	if res.Valid {
 		assert.Fail(
 			t,

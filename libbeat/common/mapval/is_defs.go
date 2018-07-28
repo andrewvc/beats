@@ -36,7 +36,7 @@ var KeyMissing = IsDef{name: "check key not present", checkKeyMissing: true}
 // IsArrayOf validates that the array at the given key is an array of objects all validatable
 // via the given Validator.
 func IsArrayOf(validator Validator) IsDef {
-	return Is("array of maps", func(path string, v interface{}) *Results {
+	return Is("array of maps", func(path Path, v interface{}) *Results {
 		vArr, isArr := v.([]common.MapStr)
 		if !isArr {
 			return SimpleResult(path, false, "Expected array at given path")
@@ -46,8 +46,7 @@ func IsArrayOf(validator Validator) IsDef {
 
 		for idx, curMap := range vArr {
 			validatorRes := validator(curMap)
-			prefix := fmt.Sprintf("%s[%d]", path, idx)
-			results.mergeUnderPrefix(prefix, validatorRes)
+			results.mergeUnderPrefix(path.ExtendSlice(idx), validatorRes)
 		}
 
 		return results
@@ -63,7 +62,7 @@ func IsAny(of ...IsDef) IsDef {
 	}
 	isName := fmt.Sprintf("either %#v", names)
 
-	return Is(isName, func(path string, v interface{}) *Results {
+	return Is(isName, func(path Path, v interface{}) *Results {
 		for _, def := range of {
 			vr := def.check(path, v, true)
 			if vr.Valid {
@@ -81,7 +80,7 @@ func IsAny(of ...IsDef) IsDef {
 
 // IsStringContaining validates that the the actual value contains the specified substring.
 func IsStringContaining(needle string) IsDef {
-	return Is("is string containing", func(path string, v interface{}) *Results {
+	return Is("is string containing", func(path Path, v interface{}) *Results {
 		strV, ok := v.(string)
 
 		if !ok {
@@ -105,7 +104,7 @@ func IsStringContaining(needle string) IsDef {
 }
 
 // IsDuration tests that the given value is a duration.
-var IsDuration = Is("is a duration", func(path string, v interface{}) *Results {
+var IsDuration = Is("is a duration", func(path Path, v interface{}) *Results {
 	if _, ok := v.(time.Duration); ok {
 		return ValidResult(path)
 	}
@@ -118,7 +117,7 @@ var IsDuration = Is("is a duration", func(path string, v interface{}) *Results {
 
 // IsEqual tests that the given object is equal to the actual object.
 func IsEqual(to interface{}) IsDef {
-	return Is("equals", func(path string, v interface{}) *Results {
+	return Is("equals", func(path Path, v interface{}) *Results {
 		if assert.ObjectsAreEqual(v, to) {
 			return ValidResult(path)
 		}
@@ -132,7 +131,7 @@ func IsEqual(to interface{}) IsDef {
 
 // IsEqualToValue tests that the given value is equal to the actual value.
 func IsEqualToValue(to interface{}) IsDef {
-	return Is("equals", func(path string, v interface{}) *Results {
+	return Is("equals", func(path Path, v interface{}) *Results {
 		if assert.ObjectsAreEqualValues(v, to) {
 			return ValidResult(path)
 		}
@@ -145,7 +144,7 @@ func IsEqualToValue(to interface{}) IsDef {
 }
 
 // IsNil tests that a value is nil.
-var IsNil = Is("is nil", func(path string, v interface{}) *Results {
+var IsNil = Is("is nil", func(path Path, v interface{}) *Results {
 	if v == nil {
 		return ValidResult(path)
 	}
@@ -157,7 +156,7 @@ var IsNil = Is("is nil", func(path string, v interface{}) *Results {
 })
 
 func intGtChecker(than int) ValueValidator {
-	return func(path string, v interface{}) *Results {
+	return func(path Path, v interface{}) *Results {
 		n, ok := v.(int)
 		if !ok {
 			msg := fmt.Sprintf("%v is a %T, but was expecting an int!", v, v)

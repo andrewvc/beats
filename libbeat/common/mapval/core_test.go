@@ -211,6 +211,47 @@ func TestComplex(t *testing.T) {
 
 func TestLiteralArray(t *testing.T) {
 	m := common.MapStr{
+		"a": []interface{}{
+			[]interface{}{1, 2, 3},
+			[]interface{}{"foo", "bar"},
+			"hello",
+		},
+	}
+
+	validator := Schema(Map{
+		"a": []interface{}{
+			[]interface{}{1, 2, 3},
+			[]interface{}{"foo", "bar"},
+			"hello",
+		},
+	})
+
+	goodRes := validator(m)
+	assertResults(t, goodRes)
+	// We evaluate multidimensional arrays as a single field for now
+	// This is kind of easier, but maybe we should do our own traversal later.
+	assert.Len(t, goodRes.Fields, 8)
+}
+
+func TestStringArray(t *testing.T) {
+	m := common.MapStr{
+		"a": []string{"a", "b"},
+	}
+
+	validator := Schema(Map{
+		"a": []string{"a", "b"},
+	})
+
+	goodRes := validator(m)
+	assertResults(t, goodRes)
+	// We evaluate multidimensional arrays as a single field for now
+	// This is kind of easier, but maybe we should do our own traversal later.
+	assert.Len(t, goodRes.Fields, 1)
+
+}
+
+func TestLiteralMdArray(t *testing.T) {
+	m := common.MapStr{
 		"a": [][]int{
 			{1, 2, 3},
 			{4, 5, 6},
