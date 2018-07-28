@@ -64,8 +64,8 @@ func TestIsArrayOf(t *testing.T) {
 	goodRes := assertIsDefValid(t, id, goodMapArr)
 	goodFields := goodRes.Fields
 	assert.Len(t, goodFields, 2)
-	assert.Contains(t, goodFields, "p[0].foo")
-	assert.Contains(t, goodFields, "p[1].foo")
+	assert.Contains(t, goodFields, "p.[0].foo")
+	assert.Contains(t, goodFields, "p.[1].foo")
 
 	badMap := common.MapStr{"foo": "bot"}
 	badMapArr := []common.MapStr{badMap}
@@ -73,7 +73,7 @@ func TestIsArrayOf(t *testing.T) {
 	badRes := assertIsDefInvalid(t, id, badMapArr)
 	badFields := badRes.Fields
 	assert.Len(t, badFields, 1)
-	assert.Contains(t, badFields, "p[0].foo")
+	assert.Contains(t, badFields, "p.[0].foo")
 }
 
 func TestIsAny(t *testing.T) {

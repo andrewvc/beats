@@ -21,6 +21,8 @@ import (
 	"sort"
 	"strings"
 
+	"reflect"
+
 	"github.com/elastic/beats/libbeat/common"
 )
 
@@ -123,7 +125,8 @@ func walkValidate(expected Map, actual common.MapStr) (results *Results) {
 			if !isIsDef {
 				// We don't check maps for equality, we check their properties
 				// individual via our own traversal, so bail early
-				if _, isMS := actualV.(common.MapStr); isMS {
+				kind := reflect.ValueOf(actualV).Kind()
+				if kind == reflect.Map || kind == reflect.Slice {
 					return
 				}
 

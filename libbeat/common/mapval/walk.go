@@ -47,38 +47,12 @@ func walkFull(o interface{}, root common.MapStr, path Path, wo walkObserver) {
 		converted := sliceToSliceOfInterfaces(o)
 
 		for idx, v := range converted {
-			// Add array subscript to last path element
 			newPath := path.ExtendSlice(idx)
-			// Not a real key, but close to it
-
-			wo(walkObserverInfo{newPath.Last(), v, root, newPath})
 			walkFull(v, root, newPath, wo)
 		}
 	default:
 		wo(walkObserverInfo{path.Last(), o, root, path})
 	}
-
-	/*
-		switch oTyped := o.(type) {
-		case common.MapStr:
-			walkFullMap(oTyped, root, path, wo)
-		case Map:
-			walkFullMap(common.MapStr(oTyped), root, path, wo)
-		case []interface{}:
-			for idx, v := range oTyped {
-				// Add array subscript to last path element
-				pLen := len(path)
-				newPath := make([]string, pLen)
-				copy(newPath, path)
-				newPath[pLen] = newPath[pLen] + fmt.Sprintf("[%d]", idx)
-
-				walkFull(v, root, newPath, wo)
-			}
-			return
-		default:
-			fmt.Printf("ENCOUNTERED A %v\n", oTyped)
-		}
-	*/
 }
 
 // walkFullMap walks the given MapStr tree.

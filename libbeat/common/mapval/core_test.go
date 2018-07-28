@@ -230,7 +230,7 @@ func TestLiteralArray(t *testing.T) {
 	assertResults(t, goodRes)
 	// We evaluate multidimensional arrays as a single field for now
 	// This is kind of easier, but maybe we should do our own traversal later.
-	assert.Len(t, goodRes.Fields, 8)
+	assert.Len(t, goodRes.Fields, 6)
 }
 
 func TestStringArray(t *testing.T) {
@@ -268,16 +268,17 @@ func TestLiteralMdArray(t *testing.T) {
 	assertResults(t, goodRes)
 	// We evaluate multidimensional arrays as a single field for now
 	// This is kind of easier, but maybe we should do our own traversal later.
-	assert.Len(t, goodRes.Fields, 1)
+	assert.Len(t, goodRes.Fields, 6)
 
-	badValidator := Schema(Map{
+	badValidator := Strict(Schema(Map{
 		"a": [][]int{
 			{1, 2, 3},
 		},
-	})
+	}))
 
 	badRes := badValidator(m)
 
 	assert.False(t, badRes.Valid)
-	assert.Len(t, badRes.Errors(), 1)
+	assert.Len(t, badRes.Fields, 6)
+	assert.Len(t, badRes.Errors(), 3)
 }
