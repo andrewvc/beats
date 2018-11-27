@@ -49,7 +49,6 @@ func newHTTPMonitorHostJob(
 	validator RespCheck,
 ) (monitors.Job, error) {
 	typ := config.Name
-	id := fmt.Sprintf("%v@%v", typ, addr)
 
 	client := &http.Client{
 		CheckRedirect: makeCheckRedirect(config.MaxRedirects),
@@ -68,6 +67,7 @@ func newHTTPMonitorHostJob(
 
 	timeout := config.Timeout
 
+	id := fmt.Sprintf("%v@%v", typ, addr)
 	return monitors.WithJobId(id,
 		monitors.WithFields(
 			common.MapStr{
@@ -98,7 +98,6 @@ func newHTTPMonitorIPsJob(
 	validator RespCheck,
 ) (monitors.Job, error) {
 	typ := config.Name
-	id := fmt.Sprintf("%v@%v", typ, addr)
 
 	req, err := buildRequest(addr, config, enc)
 	if err != nil {
@@ -110,9 +109,10 @@ func newHTTPMonitorIPsJob(
 		return nil, err
 	}
 
+	id := fmt.Sprintf("%v@%v", typ, addr)
 	settings := monitors.MakeHostJobSettings(id, hostname, config.Mode)
 
-	pingFactory := createPingFactory(config, hostname, port, tls, req, body, validator)
+	pingFactory := createPingFactory(config, port, tls, req, body, validator)
 	job, err := monitors.MakeByHostJob(settings, pingFactory)
 
 	fields := common.MapStr{
@@ -132,7 +132,6 @@ func newHTTPMonitorIPsJob(
 
 func createPingFactory(
 	config *Config,
-	hostname string,
 	port uint16,
 	tls *transport.TLSConfig,
 	request *http.Request,
@@ -193,8 +192,8 @@ func createPingFactory(
 			})
 		}
 		if !writeStart.IsZero() {
-			event.Fields.Put("http.rtt.validate", look.RTT(end.Sub(writeStart)))
-			event.Fields.Put("http.rtt.content", look.RTT(end.Sub(readStart)))
+			event.PutValue("http.rtt.validate", look.RTT(end.Sub(writeStart)))
+			event.PutValue("http.rtt.content", look.RTT(end.Sub(readStart)))
 		}
 
 		return event, err
