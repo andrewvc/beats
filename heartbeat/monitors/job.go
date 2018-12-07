@@ -19,7 +19,30 @@ package monitors
 
 import (
 	"github.com/elastic/beats/libbeat/beat"
+	"github.com/elastic/beats/libbeat/common"
 )
+
+type ImEvent interface {
+	Merge(fields common.MapStr)
+	toEvent() beat.Event
+}
+
+func MakeImEvent() ImEvent {
+	e := ImWrappedEvent(beat.Event{})
+	return &e
+}
+
+type ImWrappedEvent beat.Event
+
+func (ie *ImWrappedEvent) Merge(fields common.MapStr) {
+	if ie.Fields != nil {
+		ie.Fields.DeepUpdate(fields)
+	}
+}
+
+func (ie *ImWrappedEvent) toEvent() beat.Event {
+	return beat.Event(*ie)
+}
 
 // A Job represents a unit of execution, and may return multiple continuation jobs.
 type Job interface {

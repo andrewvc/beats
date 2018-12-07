@@ -86,13 +86,29 @@ func (e ProcessorsError) Error() string {
 func (t *configuredJob) prepareSchedulerJob(meta common.MapStr, job Job) scheduler.TaskFunc {
 	return func() []scheduler.TaskFunc {
 		event, next, err := job.Run()
+		hasContinuations := len(next) > 0
+
 		if err != nil {
 			logp.Err("Job %v failed with: ", err)
 		}
 
+		cloneEvent := func() beat.Event {
+			return beat.Event{
+				event.Timestamp,
+				event.Meta.Clone(),
+				event.Fields.Clone(),
+				nil,
+			}
+		}
+
 		if event != nil && event.Fields != nil {
 			MergeEventFields(event, meta)
-			t.client.Publish(*event)
+			// If continuations are present we defensively publish a clone of the event
+			// in the chance that the event shares underlying data with the events for continuations
+			// This prevents races where the pipeline publish could accidentally alter multiple events.
+			if hasContinuations {
+				t.client.Publish(cloneEvent())
+			}
 		}
 
 		if len(next) == 0 {
