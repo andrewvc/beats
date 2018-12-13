@@ -114,9 +114,9 @@ func AfterJobSuccess(j Job, after func(*beat.Event, []Job, error) ([]Job, error)
 // MakeSimpleJob creates a new Job from a callback function. The callback should
 // return an valid event and can not create any sub-tasks to be executed after
 // completion.
-func MakeSimpleJob(f func() (*beat.Event, error)) Job {
+func MakeSimpleJob(f func(*beat.Event) error) Job {
 	return AnonJob(func(event *beat.Event) ([]Job, error) {
-		event, err := f()
+		err := f(event)
 		return nil, err
 	})
 }

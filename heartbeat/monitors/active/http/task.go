@@ -80,9 +80,9 @@ func newHTTPMonitorHostJob(
 					"port": port,
 				},
 			},
-			monitors.MakeSimpleJob(func() (*beat.Event, error) {
-				_, _, event, err := execPing(client, request, body, timeout, validator)
-				return event, err
+			monitors.MakeSimpleJob(func(event *beat.Event) error {
+				_, _, err := execPing(event, client, request, body, timeout, validator)
+				return err
 			}),
 		)), nil
 }
@@ -140,8 +140,7 @@ func createPingFactory(
 	isTLS := request.URL.Scheme == "https"
 	checkRedirect := makeCheckRedirect(config.MaxRedirects)
 
-	return monitors.MakePingIPFactory(func(ip *net.IPAddr) (*beat.Event, error) {
-		event := &beat.Event{}
+	return monitors.MakePingIPFactory(func(event *beat.Event, ip *net.IPAddr) error {
 		addr := net.JoinHostPort(ip.String(), strconv.Itoa(int(port)))
 		d := &dialchain.DialerChain{
 			Net: dialchain.MakeConstAddrDialer(addr, dialchain.TCPDialer(timeout)),
@@ -155,7 +154,7 @@ func createPingFactory(
 
 		dialer, err := d.Build(event)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		var (
@@ -173,11 +172,7 @@ func createPingFactory(
 			},
 		}
 
-		_, end, result, err := execPing(client, request, body, timeout, validator)
-
-		if result != nil {
-			monitors.MergeEventFields(event, result.Fields)
-		}
+		_, end, err := execPing(event, client, request, body, timeout, validator)
 
 		if !readStart.IsZero() {
 			monitors.MergeEventFields(event, common.MapStr{
@@ -194,7 +189,7 @@ func createPingFactory(
 			event.PutValue("http.rtt.content", look.RTT(end.Sub(readStart)))
 		}
 
-		return event, err
+		return err
 	})
 }
 
@@ -221,28 +216,28 @@ func buildRequest(addr string, config *Config, enc contentEncoder) (*http.Reques
 }
 
 func execPing(
+	event *beat.Event,
 	client *http.Client,
 	req *http.Request,
 	body []byte,
 	timeout time.Duration,
 	validator func(*http.Response) error,
-) (start, end time.Time, event *beat.Event, errReason reason.Reason) {
+) (start, end time.Time, errReason reason.Reason) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req = attachRequestBody(&ctx, req, body)
 	start, end, resp, errReason := execRequest(client, req, validator)
 
+	addRttResp(event, end.Sub(start), resp)
 	if errReason != nil {
 		if resp != nil {
-			return start, end, makeEvent(end.Sub(start), resp), errReason
+			return start, end, errReason
 		}
-		return start, end, nil, errReason
+		return start, end, errReason
 	}
 
-	event = makeEvent(end.Sub(start), resp)
-
-	return start, end, event, nil
+	return start, end, nil
 }
 
 func attachRequestBody(ctx *context.Context, req *http.Request, body []byte) *http.Request {
@@ -279,19 +274,17 @@ func execRequest(client *http.Client, req *http.Request, validator func(*http.Re
 	return start, time.Now(), resp, nil
 }
 
-func makeEvent(rtt time.Duration, resp *http.Response) *beat.Event {
-	return &beat.Event{
-		Fields: common.MapStr{
-			"http": common.MapStr{
-				"response": common.MapStr{
-					"status_code": resp.StatusCode,
-				},
-				"rtt": common.MapStr{
-					"total": look.RTT(rtt),
-				},
+func addRttResp(event *beat.Event, rtt time.Duration, resp *http.Response) {
+	monitors.MergeEventFields(event, common.MapStr{
+		"http": common.MapStr{
+			"response": common.MapStr{
+				"status_code": resp.StatusCode,
+			},
+			"rtt": common.MapStr{
+				"total": look.RTT(rtt),
 			},
 		},
-	}
+	})
 }
 
 func splitHostnamePort(requ *http.Request) (string, uint16, error) {

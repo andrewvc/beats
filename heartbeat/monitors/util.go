@@ -154,13 +154,11 @@ func MakeSimpleCont(f func(*beat.Event) error) Job {
 
 // MakePingIPFactory creates a jobFactory for building a Task from a new IP address.
 func MakePingIPFactory(
-	f func(*net.IPAddr) (fields common.MapStr, err error),
+	f func(*beat.Event, *net.IPAddr) error,
 ) func(*net.IPAddr) Job {
 	return func(ip *net.IPAddr) Job {
 		return MakeSimpleCont(func(event *beat.Event) error {
-			fields, err := f(ip)
-			MergeEventFields(event, fields)
-			return err
+			return f(event, ip)
 		})
 	}
 }
@@ -192,12 +190,12 @@ func MakePingAllIPFactory(
 // IP/port-pairs.
 func MakePingAllIPPortFactory(
 	ports []uint16,
-	f func(*net.IPAddr, uint16) (common.MapStr, error),
+	f func(*beat.Event, *net.IPAddr, uint16) error,
 ) func(*net.IPAddr) Job {
 	if len(ports) == 1 {
 		port := ports[0]
-		return MakePingIPFactory(func(ip *net.IPAddr) (common.MapStr, error) {
-			return f(ip, port)
+		return MakePingIPFactory(func(event *beat.Event, ip *net.IPAddr) error {
+			return f(event, ip, port)
 		})
 	}
 
@@ -206,9 +204,7 @@ func MakePingAllIPPortFactory(
 		for i := range ports {
 			port := ports[i]
 			funcs[i] = func(event *beat.Event) error {
-				fields, err := f(ip, port)
-				MergeEventFields(event, fields)
-				return err
+				return f(event, ip, port)
 			}
 		}
 		return funcs
@@ -278,14 +274,15 @@ func makeByHostAnyIPJob(
 		resolveStart := time.Now()
 		ip, err := net.ResolveIPAddr(network, host)
 		if err != nil {
-			return resolveErr(host, err)
+			resolveErr(event, host, err)
+			return nil, nil
 		}
 
 		resolveEnd := time.Now()
 		resolveRTT := resolveEnd.Sub(resolveStart)
 
 		ipFields := resolveIPEvent(host, ip.String(), resolveRTT)
-		return WithFields(ipFields, pingFactory(ip)).Run()
+		return WithFields(ipFields, pingFactory(ip)).Run(event)
 	})
 
 	return TimeAndCheckJob(aj)
