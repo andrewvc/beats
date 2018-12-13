@@ -229,7 +229,18 @@ func execPing(
 	req = attachRequestBody(&ctx, req, body)
 	start, end, resp, errReason := execRequest(client, req, validator)
 
-	addRttResp(event, end.Sub(start), resp)
+	monitors.MergeEventFields(event, common.MapStr{"http": common.MapStr{
+		"rtt": common.MapStr{
+			"total": look.RTT(end.Sub(start)),
+		},
+	}})
+
+	if resp != nil {
+		monitors.MergeEventFields(event, common.MapStr{"http": common.MapStr{
+			"response": common.MapStr{"status_code": resp.StatusCode},
+		}})
+	}
+
 	if errReason != nil {
 		if resp != nil {
 			return start, end, errReason
@@ -272,19 +283,6 @@ func execRequest(client *http.Client, req *http.Request, validator func(*http.Re
 	io.Copy(ioutil.Discard, resp.Body)
 
 	return start, time.Now(), resp, nil
-}
-
-func addRttResp(event *beat.Event, rtt time.Duration, resp *http.Response) {
-	monitors.MergeEventFields(event, common.MapStr{
-		"http": common.MapStr{
-			"response": common.MapStr{
-				"status_code": resp.StatusCode,
-			},
-			"rtt": common.MapStr{
-				"total": look.RTT(rtt),
-			},
-		},
-	})
 }
 
 func splitHostnamePort(requ *http.Request) (string, uint16, error) {
