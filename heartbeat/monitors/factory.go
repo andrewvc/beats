@@ -52,9 +52,5 @@ func (f *RunnerFactory) CheckConfig(config *common.Config) error {
 		}
 	}()
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
