@@ -76,6 +76,7 @@ type ConfigChecker interface {
 	CheckConfig(config *common.Config) error
 }
 
+// CheckableRunnerFactory is the union of RunnerFactory and ConfigChecker.
 type CheckableRunnerFactory interface {
 	RunnerFactory
 	ConfigChecker
