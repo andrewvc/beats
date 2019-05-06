@@ -41,3 +41,4 @@ The list below covers the major changes between 7.0.0-rc2 and master only.
 - Only Load minimal template if no fields are provided. {pull}12103[12103]
 - Add new option `IgnoreAllErrors` to `libbeat.common.schema` for skipping fields that failed while converting. {pull}12089[12089]
 - Deprecate setup cmds for `template` and `ilm-policy`. Add new setup cmd for `index-management`. {pull}12132[12132]
+Added new CheckableRunnerFactory to more clearly delineate which RunnerFactory impls have checkable configs. {pull}12117[12117]
