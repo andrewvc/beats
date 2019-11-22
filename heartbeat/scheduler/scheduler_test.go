@@ -136,3 +136,30 @@ func TestScheduler_Stop(t *testing.T) {
 
 	assert.Equal(t, ErrAlreadyStopped, err)
 }
+
+func BenchmarkScheduler(b *testing.B) {
+	s := NewWithLocation(0, tarawaTime())
+
+	sched := instantSchedule{}
+
+	executed := make(chan struct{})
+	for i := 0; i < 1024; i++ {
+		_, err := s.Add(sched, "testPostStop", func() []TaskFunc {
+			executed <- struct{}{}
+			return nil
+		})
+		assert.NoError(b, err)
+	}
+
+	err := s.Start()
+	defer s.Stop()
+	assert.NoError(b, err)
+
+	count := 0
+	for count < b.N {
+		select {
+		case <-executed:
+			count++
+		}
+	}
+}
