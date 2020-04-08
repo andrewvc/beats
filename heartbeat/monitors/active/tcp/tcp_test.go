@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/elastic/go-lookslike/validator"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/heartbeat/hbtest"
@@ -51,24 +53,55 @@ func TestUpEndpointJob(t *testing.T) {
 	serverURL, err := url.Parse(server.URL)
 	require.NoError(t, err)
 
-	event := testTCPCheck(t, "localhost", port)
+	// Test with domain, IPv4 and IPv6
+	scenarios := []struct {
+		name       string
+		host       string
+		isIp       bool
+		expectedIp string
+	}{
+		{
+			name:       "localhost",
+			host:       "localhost",
+			isIp:       false,
+			expectedIp: "127.0.0.1",
+		},
+		{
+			name:       "ipv4",
+			host:       "127.0.0.1",
+			isIp:       true,
+			expectedIp: "127.0.0.1",
+		},
+		{
+			name:       "ipv6",
+			host:       "tcp//[::1]:80",
+			isIp:       true,
+			expectedIp: "::1",
+		},
+	}
 
-	testslike.Test(
-		t,
-		lookslike.Strict(lookslike.Compose(
-			hbtest.BaseChecks(serverURL.Hostname(), "up", "tcp"),
-			hbtest.SummaryChecks(1, 0),
-			hbtest.SimpleURLChecks(t, "tcp", "localhost", port),
-			hbtest.RespondingTCPChecks(),
-			lookslike.MustCompile(map[string]interface{}{
-				"resolve": map[string]interface{}{
-					"ip":     serverURL.Hostname(),
-					"rtt.us": isdef.IsDuration,
-				},
-			}),
-		)),
-		event.Fields,
-	)
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			event := testTCPCheck(t, scenario.host, port)
+
+			validators := []validator.Validator{
+				hbtest.BaseChecks(serverURL.Hostname(), "up", "tcp"),
+				hbtest.SummaryChecks(1, 0),
+				hbtest.SimpleURLChecks(t, "tcp", scenario.host, port),
+				hbtest.RespondingTCPChecks(),
+			}
+
+			if !scenario.isIp {
+				validators = append(validators, hbtest.ResolveChecks(scenario.expectedIp))
+			}
+
+			testslike.Test(
+				t,
+				lookslike.Strict(lookslike.Compose(validators...)),
+				event.Fields,
+			)
+		})
+	}
 }
 
 func TestConnectionRefusedEndpointJob(t *testing.T) {

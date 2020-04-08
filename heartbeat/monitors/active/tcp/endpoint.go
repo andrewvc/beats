@@ -22,7 +22,8 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // endpoint configures a host with all port numbers to be monitored by a dialer
@@ -53,32 +54,19 @@ func makeEndpoints(hosts []string, ports []uint16, defaultScheme string) (endpoi
 		host := ""
 		u, err := url.Parse(h)
 
-		if err != nil || u.Host == "" {
-			host = h
-		} else {
-			scheme = u.Scheme
-			host = u.Host
-		}
-		debugf("Add tcp endpoint '%v://%v'.", scheme, host)
-
-		switch scheme {
-		case "tcp", "plain", "tls", "ssl":
-		default:
-			err := fmt.Errorf("'%v' is not a supported connection scheme in '%v'", scheme, h)
-			return nil, err
-		}
-
-		pair := strings.SplitN(host, ":", 2)
-		if len(pair) == 2 {
-			port, err := strconv.ParseUint(pair[1], 10, 16)
+		if err == nil && u.Host != "" {
+			ep, err := makeURLEndpoint(u, ports)
 			if err != nil {
-				return nil, fmt.Errorf("'%v' is no valid port number in '%v'", pair[1], h)
+				return nil, err
 			}
-
-			ports = []uint16{uint16(port)}
-			host = pair[0]
-		} else if len(ports) == 0 {
-			return nil, fmt.Errorf("host '%v' missing port number", h)
+			endpoints = append(endpoints, ep)
+		} else {
+			u := &url.URL{Scheme: defaultScheme, Host: h}
+			ep, err := makeURLEndpoint(u, ports)
+			if err != nil {
+				return nil, err
+			}
+			endpoints = append(endpoints, ep)
 		}
 
 		endpoints = append(endpoints, endpoint{
@@ -88,4 +76,37 @@ func makeEndpoints(hosts []string, ports []uint16, defaultScheme string) (endpoi
 		})
 	}
 	return endpoints, nil
+}
+
+func makeURLEndpoint(u *url.URL, ports []uint16) (endpoint, error) {
+	switch u.Scheme {
+	case "tcp", "plain", "tls", "ssl":
+	default:
+		err := fmt.Errorf("'%s' is not a supported connection scheme in '%s'", u.Scheme, u)
+		return endpoint{}, err
+	}
+
+	if u.Port() != "" {
+		pUint, err := strconv.ParseUint(u.Port(), 10, 16)
+		if err != nil {
+			return endpoint{}, errors.Wrapf(err, "no port(s) defined for TCP endpoint %s", u)
+		}
+		if err != nil {
+			ports = append(ports, uint16(pUint))
+		}
+	}
+
+	if len(ports) == 0 {
+		return nil, fmt.Errorf("host '%s' missing port number", u)
+	}
+
+	return endpoint{
+		Scheme:   u.Scheme,
+		Hostname: u.Hostname(),
+		Ports:    ports,
+	}, nil
+}
+
+func makeHostPortEndpoint(hostPort string, ports []uint16) endpoint {
+
 }
