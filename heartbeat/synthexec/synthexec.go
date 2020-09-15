@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -46,7 +47,7 @@ func RunSuite(suiteFile string, journeyName string) (out *CmdOut, err error) {
 func RunScript(script string) (out *CmdOut, err error) {
 	cmd := exec.Command(
 		"npx",
-		"elastic-synthetics",
+		"@elastic/synthetics",
 		"--stdin",
 		"--json",
 		"--headless",
@@ -57,6 +58,7 @@ func RunScript(script string) (out *CmdOut, err error) {
 }
 
 func runCmd(cmd *exec.Cmd, stdinStr *string) (*CmdOut, error) {
+	cmd.Env = append(os.Environ(), "NODE_ENV=production")
 	logp.Info("Running command: %s", cmd.String())
 
 	if stdinStr	!= nil {
@@ -65,6 +67,7 @@ func runCmd(cmd *exec.Cmd, stdinStr *string) (*CmdOut, error) {
 
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
+		logp.Warn("Exiting after command %s", cmd.String())
 		return nil, err
 	}
 
