@@ -30,7 +30,7 @@ func ListSuite(suiteFile string) (out *CmdOut, err error) {
 }
 
 func RunSuite(suiteFile string, journeyName string) (out *CmdOut, err error) {
-	logp.Warn("RUNNING JOURNEY %s", journeyName)
+	logp.Warn("Running journey %s", journeyName)
 	cmd := exec.Command(
 		"node",
 		suiteFile,
@@ -77,7 +77,6 @@ func runCmd(cmd *exec.Cmd, stdinStr *string) (*CmdOut, error) {
 	scanner.Buffer(buf, 1024*1024*200) // Max 200MiB Buffer
 	for scanner.Scan() {
 		if scanner.Err() != nil {
-			logp.Warn("GOT SCAN ERR %w", scanner.Err())
 			return nil, scanner.Err()
 		}
 
@@ -87,10 +86,8 @@ func runCmd(cmd *exec.Cmd, stdinStr *string) (*CmdOut, error) {
 			out.Result = result
 		}
 		if result != nil {
-			logp.Warn("GOT RESULT %s", result)
 		}
 		if result == nil {
-			logp.Warn("GOT LINE '%s'", scanner.Text())
 			out.Lines = append(out.Lines, scanner.Text())
 		}
 	}
