@@ -81,11 +81,34 @@ type Format mg.Namespace
 // Demo runs agent out of container.
 type Demo mg.Namespace
 
+// Dev runs package and build for dev purposes.
+type Dev mg.Namespace
+
 // Env returns information about the environment.
 func (Prepare) Env() {
 	mg.Deps(Mkdir("build"), Build.GenerateConfig)
 	RunGo("version")
 	RunGo("env")
+}
+
+// Build builds the agent binary with DEV flag set.
+func (Dev) Build() {
+	dev := os.Getenv(devEnv)
+	defer os.Setenv(devEnv, dev)
+
+	os.Setenv(devEnv, "true")
+	devtools.DevBuild = true
+	mg.Deps(Build.All)
+}
+
+// Package packages the agent binary with DEV flag set.
+func (Dev) Package() {
+	dev := os.Getenv(devEnv)
+	defer os.Setenv(devEnv, dev)
+
+	os.Setenv(devEnv, "true")
+	devtools.DevBuild = true
+	Package()
 }
 
 // InstallGoLicenser install go-licenser to check license of the files.
@@ -536,7 +559,7 @@ func packageAgent(requiredPackages []string, packagingFn func()) {
 		defer os.RemoveAll(dropPath)
 		defer os.Unsetenv(agentDropPath)
 
-		packedBeats := []string{"filebeat", "heartbeat", "metricbeat"}
+		packedBeats := []string{"filebeat", "metricbeat"}
 
 		for _, b := range packedBeats {
 			pwd, err := filepath.Abs(filepath.Join("..", b))
@@ -610,6 +633,7 @@ func buildVars() map[string]string {
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {
 			vars["github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release.allowEmptyPgp"] = "true"
+			vars["github.com/elastic/beats/v7/x-pack/elastic-agent/pkg/release.allowUpgrade"] = "true"
 		}
 	}
 

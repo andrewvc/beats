@@ -343,6 +343,14 @@ metricbeat.modules:
   metrics:
     - id: ["requests/count", "requests/duration"]
 
+- module: azure
+  metricsets:
+    - app_state
+  enabled: true
+  period: 300s
+  application_id: ''
+  api_key: ''
+
 #--------------------------------- Beat Module ---------------------------------
 - module: beat
   metricsets:
@@ -390,6 +398,7 @@ metricbeat.modules:
   rlp_address: '${CLOUDFOUNDRY_RLP_ADDRESS:""}'
   client_id: '${CLOUDFOUNDRY_CLIENT_ID:""}'
   client_secret: '${CLOUDFOUNDRY_CLIENT_SECRET:""}'
+  shard_id: metricbeat
   version: v1
 
 #----------------------------- CockroachDB Module -----------------------------
@@ -686,6 +695,13 @@ metricbeat.modules:
   # use istio-pilot.istio-system:15014, when deploying Metricbeat in a kubernetes cluster as Pod or Daemonset
   hosts: ["localhost:15014"]
 
+# Istio istiod to monitor the Istio Daemon for versions after 1.5 of Istio.
+- module: istio
+  metricsets: ['istiod']
+  period: 10s
+  # use istiod.istio-system:15014, when deploying Metricbeat in a kubernetes cluster as Pod or Daemonset
+  hosts: ['localhost:15014']
+
 #------------------------------- Jolokia Module -------------------------------
 - module: jolokia
   #metricsets: ["jmx"]
@@ -895,8 +911,10 @@ metricbeat.modules:
   period: 10s
   metricsets:
     - "pageinfo"
+    - "memory"
     # - ksm
     # - conntrack
+    # - iostat
   enabled: true
   #hostfs: /hostfs
 
@@ -2382,6 +2400,11 @@ output.elasticsearch:
 
 # Set to false to disable template loading.
 #setup.template.enabled: true
+
+# Select the kind of index template. From Elasticsearch 7.8, it is possible to
+# use component templates. Available options: legacy, component, index.
+# By default metricbeat uses the legacy index templates.
+#setup.template.type: legacy
 
 # Template name. By default the template name is "metricbeat-%{[agent.version]}"
 # The template name and pattern has to be set in case the Elasticsearch index pattern is modified.
