@@ -25,11 +25,21 @@ type runResult struct {
 	Type string `json:"type"`
 }
 
+type rserverConfig struct {
+	Users map[string]string `config:"users"`
+}
+
 func create(name string, cfg *common.Config) (p plugin.Plugin, err error) {
+	config := &rserverConfig{}
+	err = cfg.Unpack(config)
+	if err != nil {
+		return plugin.Plugin{}, err
+	}
+
 	results := make(chan runResult)
 
 	go func() {
-		startServer(":8080", results)
+		startServer(":8080", results, config.Users)
 	}()
 
 	return plugin.Plugin{
@@ -51,7 +61,7 @@ func readResult (event *beat.Event, results chan runResult) (error) {
 	return nil
 }
 
-func startServer(addr string, results chan runResult) {
+func startServer(addr string, results chan runResult, users map[string]string) {
 	logp.Info("Starting rserver")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -67,9 +77,9 @@ func startServer(addr string, results chan runResult) {
 			return
 		}
 
-		if password != "biscuits" {
-			logp.Warn("PASS IS %s", password)
-			handleErr("auth", fmt.Errorf("password is not tasty enough"))
+		if userPass, ok := users[user]; !ok || password != userPass {
+			handleErr("auth", fmt.Errorf("could not authorize user"))
+			logp.Warn("Users %v", users)
 			return
 		}
 
