@@ -35,12 +35,17 @@ type intervalScheduler struct {
 	interval time.Duration
 }
 
+type oneTimeScheduler struct {}
+
 // RunOnInit returns true for interval schedulers.
 func (s intervalScheduler) RunOnInit() bool {
 	return true
 }
 
 func Parse(in string) (*Schedule, error) {
+	if in == "once" {
+		return &Schedule{oneTimeScheduler{}}, nil
+	}
 	every := "@every"
 
 	// add '@every' keyword
@@ -72,6 +77,16 @@ func MustParse(in string) *Schedule {
 
 func (s intervalScheduler) Next(t time.Time) time.Time {
 	return t.Add(s.interval)
+}
+
+func (s oneTimeScheduler) RunOnInit() bool {
+	return true
+}
+
+// TODO: Hack Figure out a better way to really only run once
+func (s oneTimeScheduler) Next(t time.Time) time.Time {
+	t.Add(time.Hour * 24 * 365 * 20)
+	return t
 }
 
 func (s *Schedule) Unpack(str string) error {

@@ -6,10 +6,12 @@ import (
 	"github.com/elastic/beats/v7/heartbeat/eventext"
 	"github.com/elastic/beats/v7/heartbeat/monitors/jobs"
 	"github.com/elastic/beats/v7/heartbeat/monitors/plugin"
+	"github.com/elastic/beats/v7/heartbeat/monitors/stdfields"
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/logp"
 	"net/http"
+	"sync"
 )
 
 func init() {
@@ -26,7 +28,7 @@ func create(name string, cfg *common.Config) (p plugin.Plugin, err error) {
 	results := make(chan runResult)
 
 	go func() {
-		startServer(":5678")
+		startServer(":5678", results)
 	}()
 
 	return plugin.Plugin{
@@ -48,21 +50,107 @@ func readResult (event *beat.Event, results chan runResult) (error) {
 	return nil
 }
 
-func startServer(addr string) {
+func startServer(addr string, results chan runResult) {
 	logp.Info("Starting rserver")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		handleErr := func (context string, err error) {
+			writer.WriteHeader(400)
+			writer.Write([]byte(fmt.Sprintf("unexpected error [%s] %s", context, err)))
+		}
+
+		user, password, hasPassword := request.BasicAuth()
+
+		if !hasPassword {
+			handleErr("auth", fmt.Errorf("no password specified"))
+			return
+		}
+
+		if password != "biscuits" {
+			logp.Warn("PASS IS %s", password)
+			handleErr("auth", fmt.Errorf("password is not tasty enough"))
+			return
+		}
+
 		parsed := &common.MapStr{}
 		decodeErr := json.NewDecoder(request.Body).Decode(&parsed)
 		if decodeErr != nil {
-			logp.Warn("Could not decode %v", decodeErr)
+			handleErr("decoding", decodeErr)
+			return
 		}
+
+		config, err := common.NewConfigFrom(parsed)
+		if err != nil {
+			handleErr("reading config", err)
+			return
+		}
+
+		fields, err := stdfields.ConfigToStdMonitorFields(config)
+		if err != nil {
+			handleErr("stdfields", err)
+			return
+		}
+
+		p, ok := plugin.GlobalPluginsReg.Get(fields.Type)
+		if !ok {
+			handleErr("plugin reg", fmt.Errorf("could not find plugin for %s", fields.Type))
+			return
+		}
+
+		builtPlugin, err := p.Builder(fields.Type, config)
+		if err != nil {
+			handleErr("plugin build", err)
+			return
+		}
+
+		flusher, ok := writer.(http.Flusher)
+		if !ok {
+			panic("not a flusher!")
+		}
+
+		wg := sync.WaitGroup{}
+		writeMtx := sync.Mutex{}
+		var runRecursive func(j jobs.Job)
+		runRecursive = func(j jobs.Job) {
+			e := &beat.Event{Fields: common.MapStr{}}
+			conts, _ := j(e)
+
+			marshalled, err := json.Marshal(e)
+			if err != nil {
+				logp.Warn("Could not marshall: %s", err)
+			}
+
+			writeMtx.Lock()
+			_, err = writer.Write(marshalled)
+			if err != nil {
+				logp.Warn("Could not write chunk %s", err)
+			}
+			flusher.Flush()
+			writeMtx.Unlock()
+
+			for _, cj := range conts {
+				wg.Add(1)
+				go runRecursive(cj)
+			}
+
+			wg.Done()
+		}
+		for _, j := range builtPlugin.Jobs {
+			wg.Add(1)
+			runRecursive(j)
+		}
+		wg.Wait()
 
 		out, err := json.Marshal(parsed)
 		if err != nil {
 			logp.Warn("could not marshal decoded")
 		}
 		writer.Write(out)
+
+		results <- runResult{
+			Type: fields.Type,
+			UserId: user,
+		}
 	})
 	err := http.ListenAndServe(addr, mux)
 	if err != nil {
