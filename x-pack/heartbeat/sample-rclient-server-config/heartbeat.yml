@@ -25,6 +25,8 @@ heartbeat.monitors:
   id: my-monitor
   name: My Monitor
   schedule: 'once'
+  users:
+    elastic: changeme
 
 # ======================= Elasticsearch template setting =======================
 
