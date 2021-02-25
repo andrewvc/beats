@@ -7,6 +7,7 @@ import (
 	"github.com/elastic/beats/v7/heartbeat/monitors/jobs"
 	"github.com/elastic/beats/v7/heartbeat/monitors/plugin"
 	"github.com/elastic/beats/v7/heartbeat/monitors/stdfields"
+	"github.com/elastic/beats/v7/heartbeat/monitors/wrappers"
 	"github.com/elastic/beats/v7/libbeat/beat"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/logp"
@@ -28,7 +29,7 @@ func create(name string, cfg *common.Config) (p plugin.Plugin, err error) {
 	results := make(chan runResult)
 
 	go func() {
-		startServer(":5678", results)
+		startServer(":8080", results)
 	}()
 
 	return plugin.Plugin{
@@ -115,7 +116,10 @@ func startServer(addr string, results chan runResult) {
 			e := &beat.Event{Fields: common.MapStr{}}
 			conts, _ := j(e)
 
-			marshalled, err := json.Marshal(e)
+			out := e.Fields
+			out.Put("@timestamp", e.Timestamp)
+			marshalled, err := json.Marshal(out)
+			marshalled = append(marshalled, []byte("\n")...)
 			if err != nil {
 				logp.Warn("Could not marshall: %s", err)
 			}
@@ -135,17 +139,11 @@ func startServer(addr string, results chan runResult) {
 
 			wg.Done()
 		}
-		for _, j := range builtPlugin.Jobs {
+		for _, j := range wrappers.WrapCommon(builtPlugin.Jobs, fields) {
 			wg.Add(1)
 			runRecursive(j)
 		}
 		wg.Wait()
-
-		out, err := json.Marshal(parsed)
-		if err != nil {
-			logp.Warn("could not marshal decoded")
-		}
-		writer.Write(out)
 
 		results <- runResult{
 			Type: fields.Type,

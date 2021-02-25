@@ -38,7 +38,9 @@ import (
 
 // WrapCommon applies the common wrappers that all monitor jobs get.
 func WrapCommon(js []jobs.Job, stdMonFields stdfields.StdMonitorFields) []jobs.Job {
-	if stdMonFields.Type == "browser" {
+	if stdMonFields.Type == "rclient" {
+		return jobs.WrapAll(js, addMonitorMeta(stdMonFields, len(js) > 1))
+	} else if stdMonFields.Type == "browser" {
 		return WrapBrowser(js, stdMonFields)
 	} else {
 		return WrapLightweight(js, stdMonFields)
@@ -106,14 +108,27 @@ func addMonitorMetaFields(event *beat.Event, started time.Time, sf stdfields.Std
 		name = fmt.Sprintf("%s - %s", sf.Name, v.(string))
 	}
 
-	fieldsToMerge := common.MapStr{
-		"monitor": common.MapStr{
-			"id":       id,
-			"name":     name,
-			"type":     sf.Type,
-			"timespan": timespan(started, sf.Schedule, sf.Timeout),
-		},
+	//HACK
+	var fieldsToMerge common.MapStr
+	if sf.Type == "rserver" {
+		fieldsToMerge = common.MapStr{
+			"monitor": common.MapStr{
+				"id":       id,
+				"name":     name,
+				"type":     sf.Type,
+			},
+		}
+	} else {
+		fieldsToMerge = common.MapStr{
+			"monitor": common.MapStr{
+				"id":       id,
+				"name":     name,
+				"type":     sf.Type,
+				"timespan": timespan(started, sf.Schedule, sf.Timeout),
+			},
+		}
 	}
+
 
 	// Add service.name for APM interop
 	if sf.Service.Name != "" {
