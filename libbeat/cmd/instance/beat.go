@@ -455,6 +455,7 @@ func (b *Beat) launch(settings Settings, bt beat.Creator) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	var stopBeat = func() {
 		b.Instrumentation.Tracer().Close()
+		logp.Info("signal received, will shut down")
 		beater.Stop()
 	}
 	svc.HandleSignals(stopBeat, cancel)
@@ -468,7 +469,10 @@ func (b *Beat) launch(settings Settings, bt beat.Creator) error {
 
 	// Launch config manager
 	b.Manager.Start(beater.Stop)
-	defer b.Manager.Stop()
+	defer func() {
+		logp.Info("config manager has finished, will shut down")
+		b.Manager.Stop()
+	}()
 
 	return beater.Run(&b.Beat)
 }
